@@ -23,3 +23,5 @@ logs/
 
 # Coverage
 coverage/
+
+/generated/prisma
