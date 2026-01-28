@@ -31,3 +31,34 @@ export class AnalyzeResultDto {
 export class AnalyzeRequestDto {
   // 이미지는 multipart/form-data로 전송되므로 별도 필드 불필요
 }
+
+export class AnalysisHistoryResponseDto {
+  @ApiProperty({ description: '이력 ID' })
+  id: string;
+
+  @ApiPropertyOptional({ description: '사용자 ID' })
+  userId?: string | null;
+
+  @ApiPropertyOptional({ description: '게스트 ID' })
+  guestId?: string | null;
+
+  @ApiProperty({ description: '이미지 URL' })
+  imageUrl: string;
+
+  @ApiProperty({ description: '분석 결과', type: [DetectedSymbolDto] })
+  result: DetectedSymbolDto[];
+
+  @ApiProperty({ description: '생성일시' })
+  createdAt: Date;
+}
+
+export class AnalysisHistoryListResponseDto {
+  @ApiProperty({
+    description: '분석 이력 목록',
+    type: [AnalysisHistoryResponseDto],
+  })
+  histories: AnalysisHistoryResponseDto[];
+
+  @ApiProperty({ description: '총 개수' })
+  total: number;
+}

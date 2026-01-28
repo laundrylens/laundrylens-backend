@@ -1,7 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { OpenAIVisionService } from './services';
-import { AnalyzeResultDto, DetectedSymbolDto } from './dto';
+import {
+  AnalyzeResultDto,
+  DetectedSymbolDto,
+  AnalysisHistoryResponseDto,
+  AnalysisHistoryListResponseDto,
+} from './dto';
 
 @Injectable()
 export class AnalyzeService {
@@ -103,11 +108,50 @@ export class AnalyzeService {
     });
   }
 
-  async getAnalysisHistory(userId: string) {
-    return this.prisma.analysisHistory.findMany({
+  async getAnalysisHistory(
+    userId: string,
+  ): Promise<AnalysisHistoryListResponseDto> {
+    const histories = await this.prisma.analysisHistory.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 20,
     });
+
+    return {
+      histories: histories.map((history) => ({
+        id: history.id,
+        userId: history.userId,
+        guestId: history.guestId,
+        imageUrl: history.imageUrl,
+        result: history.result as unknown as DetectedSymbolDto[],
+        createdAt: history.createdAt,
+      })),
+      total: histories.length,
+    };
+  }
+
+  async getAnalysisHistoryById(
+    userId: string,
+    historyId: string,
+  ): Promise<AnalysisHistoryResponseDto> {
+    const history = await this.prisma.analysisHistory.findFirst({
+      where: {
+        id: historyId,
+        userId,
+      },
+    });
+
+    if (!history) {
+      throw new NotFoundException('분석 이력을 찾을 수 없습니다.');
+    }
+
+    return {
+      id: history.id,
+      userId: history.userId,
+      guestId: history.guestId,
+      imageUrl: history.imageUrl,
+      result: history.result as unknown as DetectedSymbolDto[],
+      createdAt: history.createdAt,
+    };
   }
 }
