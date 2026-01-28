@@ -5,6 +5,7 @@ import {
   SymbolQueryDto,
   SymbolListResponseDto,
   SymbolDetailResponseDto,
+  CountryListResponseDto,
 } from './dto';
 
 @ApiTags('symbols')
@@ -23,6 +24,17 @@ export class SymbolsController {
     @Query() query: SymbolQueryDto,
   ): Promise<SymbolListResponseDto> {
     return this.symbolsService.findAll(query.category);
+  }
+
+  @Get('countries')
+  @ApiOperation({ summary: '지원 국가 목록 조회' })
+  @ApiResponse({
+    status: 200,
+    description: '지원 국가 목록 조회 성공',
+    type: CountryListResponseDto,
+  })
+  getCountries(): CountryListResponseDto {
+    return this.symbolsService.getSupportedCountries();
   }
 
   @Get(':id')

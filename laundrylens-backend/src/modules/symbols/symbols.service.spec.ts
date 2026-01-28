@@ -181,4 +181,17 @@ describe('SymbolsService', () => {
       });
     });
   });
+
+  describe('getSupportedCountries', () => {
+    it('should return list of supported countries', () => {
+      const result = service.getSupportedCountries();
+
+      expect(result.countries).toHaveLength(3);
+      expect(result.countries[0]).toEqual({
+        code: 'ko',
+        nameKo: '한국어',
+        nameEn: 'Korean',
+      });
+    });
+  });
 });
