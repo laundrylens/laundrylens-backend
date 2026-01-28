@@ -210,21 +210,8 @@ describe('AuthService', () => {
   });
 
   describe('deleteAccount', () => {
-    it('should soft delete user and call unlink callback', async () => {
-      const unlinkCallback = jest.fn().mockResolvedValue(undefined);
-
-      await service.deleteAccount(
-        'user-id-1',
-        SocialProvider.KAKAO,
-        unlinkCallback,
-      );
-
-      expect(unlinkCallback).toHaveBeenCalled();
-      expect(mockUsersService.softDelete).toHaveBeenCalledWith('user-id-1');
-    });
-
-    it('should soft delete user without callback', async () => {
-      await service.deleteAccount('user-id-1', SocialProvider.KAKAO);
+    it('should soft delete user', async () => {
+      await service.deleteAccount('user-id-1');
 
       expect(mockUsersService.softDelete).toHaveBeenCalledWith('user-id-1');
     });

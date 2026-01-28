@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { SocialProvider, User } from '@prisma/client';
+import { User } from '@prisma/client';
 import { UsersService } from '../users';
 import { OAuthUser } from './interfaces';
 import { TokenResponseDto } from './dto';
@@ -147,17 +147,8 @@ export class AuthService {
     return this.usersService.findById(payload.sub);
   }
 
-  async deleteAccount(
-    userId: string,
-    provider: SocialProvider,
-    unlinkCallback?: () => Promise<void>,
-  ): Promise<void> {
-    // 소셜 계정 연결 해제 콜백 실행
-    if (unlinkCallback) {
-      await unlinkCallback();
-    }
-
-    // 사용자 소프트 삭제
+  async deleteAccount(userId: string): Promise<void> {
+    // 사용자 소프트 삭제 (관련 소셜 계정도 함께 처리)
     await this.usersService.softDelete(userId);
   }
 }
