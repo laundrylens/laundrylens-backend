@@ -1,0 +1,224 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum SocialProvider {
+  KAKAO
+  GOOGLE
+}
+
+enum PlanType {
+  MONTHLY
+  CREDITS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum SymbolCategory {
+  WASH
+  BLEACH
+  DRY
+  IRON
+  DRYCLEAN
+}
+
+enum Frequency {
+  ALWAYS
+  OFTEN
+  SOMETIMES
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+/// 사용자 테이블
+model User {
+  id            String    @id @default(uuid())
+  email         String?   @unique
+  nickname      String
+  profileImage  String?   @map("profile_image")
+  isPremium     Boolean   @default(false) @map("is_premium")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  // Relations
+  socialAccounts    SocialAccount[]
+  subscriptions     Subscription[]
+  payments          Payment[]
+  usageLogs         UsageLog[]
+  analysisHistories AnalysisHistory[]
+
+  @@map("users")
+}
+
+/// 소셜 계정 연결 테이블
+model SocialAccount {
+  id           String         @id @default(uuid())
+  userId       String         @map("user_id")
+  provider     SocialProvider
+  providerId   String         @map("provider_id")
+  accessToken  String?        @map("access_token")
+  refreshToken String?        @map("refresh_token")
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@map("social_accounts")
+}
+
+/// 구독 테이블
+model Subscription {
+  id        String             @id @default(uuid())
+  userId    String             @map("user_id")
+  planType  PlanType           @map("plan_type")
+  credits   Int                @default(0)
+  startedAt DateTime           @map("started_at")
+  expiresAt DateTime?          @map("expires_at")
+  status    SubscriptionStatus @default(ACTIVE)
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+/// 결제 내역 테이블
+model Payment {
+  id         String        @id @default(uuid())
+  userId     String        @map("user_id")
+  orderId    String        @unique @map("order_id")
+  paymentKey String?       @map("payment_key")
+  amount     Int
+  planType   PlanType      @map("plan_type")
+  status     PaymentStatus @default(PENDING)
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+/// 사용 이력 테이블 (분석 횟수 추적)
+model UsageLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  guestId   String?  @map("guest_id")
+  action    String   @default("analyze")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([guestId, createdAt])
+  @@index([userId, createdAt])
+  @@map("usage_logs")
+}
+
+/// 세탁기호 마스터 테이블
+model LaundrySymbol {
+  id        String         @id @default(uuid())
+  category  SymbolCategory
+  code      String         @unique
+  iconUrl   String?        @map("icon_url")
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  // Relations
+  translations    SymbolTranslation[]
+  materialSymbols MaterialSymbol[]
+
+  @@map("laundry_symbols")
+}
+
+/// 세탁기호 국가별 번역 테이블
+model SymbolTranslation {
+  id          String @id @default(uuid())
+  symbolId    String @map("symbol_id")
+  countryCode String @map("country_code")
+  name        String
+  shortDesc   String @map("short_desc")
+  detailDesc  String @map("detail_desc")
+
+  // Relations
+  symbol LaundrySymbol @relation(fields: [symbolId], references: [id], onDelete: Cascade)
+
+  @@unique([symbolId, countryCode])
+  @@map("symbol_translations")
+}
+
+/// 분석 이력 테이블
+model AnalysisHistory {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  guestId   String?  @map("guest_id")
+  imageUrl  String?  @map("image_url")
+  result    Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([guestId, createdAt])
+  @@map("analysis_history")
+}
+
+/// 소재 테이블
+model Material {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  nameKo      String   @map("name_ko")
+  nameEn      String   @map("name_en")
+  nameJp      String   @map("name_jp")
+  description String
+  careTips    String   @map("care_tips")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  materialSymbols MaterialSymbol[]
+
+  @@map("materials")
+}
+
+/// 소재-세탁기호 연결 테이블
+model MaterialSymbol {
+  id         String    @id @default(uuid())
+  materialId String    @map("material_id")
+  symbolId   String    @map("symbol_id")
+  frequency  Frequency
+  note       String?
+
+  // Relations
+  material Material      @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  symbol   LaundrySymbol @relation(fields: [symbolId], references: [id], onDelete: Cascade)
+
+  @@unique([materialId, symbolId])
+  @@map("material_symbols")
+}
