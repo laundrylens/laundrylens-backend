@@ -33,6 +33,7 @@ describe('SymbolsController', () => {
     findById: jest.fn(),
     findByCode: jest.fn(),
     findByCategory: jest.fn(),
+    getSupportedCountries: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -73,6 +74,23 @@ describe('SymbolsController', () => {
       expect(mockSymbolsService.findAll).toHaveBeenCalledWith(
         SymbolCategory.WASH,
       );
+    });
+  });
+
+  describe('getCountries', () => {
+    it('should return supported countries', () => {
+      const mockCountries = {
+        countries: [
+          { code: 'ko', nameKo: '한국어', nameEn: 'Korean' },
+          { code: 'en', nameKo: '영어', nameEn: 'English' },
+        ],
+      };
+      mockSymbolsService.getSupportedCountries.mockReturnValue(mockCountries);
+
+      const result = controller.getCountries();
+
+      expect(result).toEqual(mockCountries);
+      expect(mockSymbolsService.getSupportedCountries).toHaveBeenCalled();
     });
   });
 

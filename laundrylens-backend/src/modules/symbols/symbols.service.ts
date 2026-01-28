@@ -65,4 +65,15 @@ export class SymbolsService {
       orderBy: { code: 'asc' },
     });
   }
+
+  getSupportedCountries() {
+    // 지원 국가 목록 (하드코딩)
+    const countries = [
+      { code: 'ko', nameKo: '한국어', nameEn: 'Korean' },
+      { code: 'en', nameKo: '영어', nameEn: 'English' },
+      { code: 'jp', nameKo: '일본어', nameEn: 'Japanese' },
+    ];
+
+    return { countries };
+  }
 }
