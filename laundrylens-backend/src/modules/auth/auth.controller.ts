@@ -12,7 +12,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
-import { KakaoService } from './services';
+import { KakaoService, GoogleService } from './services';
 import { OAuthCallbackDto, TokenResponseDto } from './dto';
 
 @ApiTags('auth')
@@ -21,6 +21,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly kakaoService: KakaoService,
+    private readonly googleService: GoogleService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -68,6 +69,53 @@ export class AuthController {
   @ApiResponse({ status: 401, description: '인증 실패' })
   async kakaoToken(@Body() dto: OAuthCallbackDto): Promise<TokenResponseDto> {
     const oauthUser = await this.kakaoService.authenticate(dto.code);
+    const user = await this.authService.validateOAuthUser(oauthUser);
+    return this.authService.createTokenResponse(user);
+  }
+
+  @Get('google')
+  @ApiOperation({ summary: '구글 로그인 페이지로 리다이렉트' })
+  @ApiResponse({
+    status: 302,
+    description: '구글 로그인 페이지로 리다이렉트',
+  })
+  googleLogin(@Res() res: Response): void {
+    const authUrl = this.googleService.getAuthorizationUrl();
+    res.redirect(authUrl);
+  }
+
+  @Get('google/callback')
+  @ApiOperation({ summary: '구글 OAuth 콜백 처리' })
+  @ApiResponse({
+    status: 200,
+    description: '로그인 성공',
+    type: TokenResponseDto,
+  })
+  @ApiResponse({ status: 401, description: '인증 실패' })
+  async googleCallback(
+    @Query() dto: OAuthCallbackDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    const oauthUser = await this.googleService.authenticate(dto.code);
+    const user = await this.authService.validateOAuthUser(oauthUser);
+    const tokenResponse = this.authService.createTokenResponse(user);
+
+    const frontendUrl = this.configService.get<string>('frontend.url');
+    const redirectUrl = `${frontendUrl}/auth/callback?accessToken=${tokenResponse.accessToken}&refreshToken=${tokenResponse.refreshToken}`;
+    res.redirect(redirectUrl);
+  }
+
+  @Post('google/token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '구글 인가코드로 토큰 발급' })
+  @ApiResponse({
+    status: 200,
+    description: '토큰 발급 성공',
+    type: TokenResponseDto,
+  })
+  @ApiResponse({ status: 401, description: '인증 실패' })
+  async googleToken(@Body() dto: OAuthCallbackDto): Promise<TokenResponseDto> {
+    const oauthUser = await this.googleService.authenticate(dto.code);
     const user = await this.authService.validateOAuthUser(oauthUser);
     return this.authService.createTokenResponse(user);
   }
