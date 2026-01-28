@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Param,
   UseInterceptors,
   UploadedFile,
   UseGuards,
@@ -15,10 +16,15 @@ import {
   ApiConsumes,
   ApiBearerAuth,
   ApiBody,
+  ApiParam,
 } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { AnalyzeService } from './analyze.service';
-import { AnalyzeResultDto } from './dto';
+import {
+  AnalyzeResultDto,
+  AnalysisHistoryResponseDto,
+  AnalysisHistoryListResponseDto,
+} from './dto';
 import { JwtAuthGuard, CurrentUser, Public } from '../auth';
 
 @ApiTags('analyze')
@@ -124,10 +130,35 @@ export class AnalyzeController {
   @Get('history')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '분석 이력 조회' })
-  @ApiResponse({ status: 200, description: '이력 조회 성공' })
+  @ApiOperation({ summary: '분석 이력 목록 조회' })
+  @ApiResponse({
+    status: 200,
+    description: '이력 목록 조회 성공',
+    type: AnalysisHistoryListResponseDto,
+  })
   @ApiResponse({ status: 401, description: '인증 필요' })
-  async getHistory(@CurrentUser() user: User) {
+  async getHistory(
+    @CurrentUser() user: User,
+  ): Promise<AnalysisHistoryListResponseDto> {
     return this.analyzeService.getAnalysisHistory(user.id);
+  }
+
+  @Get('history/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '분석 이력 상세 조회' })
+  @ApiParam({ name: 'id', description: '분석 이력 ID' })
+  @ApiResponse({
+    status: 200,
+    description: '이력 상세 조회 성공',
+    type: AnalysisHistoryResponseDto,
+  })
+  @ApiResponse({ status: 401, description: '인증 필요' })
+  @ApiResponse({ status: 404, description: '이력을 찾을 수 없음' })
+  async getHistoryById(
+    @CurrentUser() user: User,
+    @Param('id') historyId: string,
+  ): Promise<AnalysisHistoryResponseDto> {
+    return this.analyzeService.getAnalysisHistoryById(user.id, historyId);
   }
 }

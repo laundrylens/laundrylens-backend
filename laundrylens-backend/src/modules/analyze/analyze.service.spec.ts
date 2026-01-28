@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { AnalyzeService } from './analyze.service';
 import { OpenAIVisionService } from './services';
 import { PrismaService } from '../../prisma';
@@ -42,6 +43,7 @@ describe('AnalyzeService', () => {
     analysisHistory: {
       create: jest.fn(),
       findMany: jest.fn(),
+      findFirst: jest.fn(),
     },
     usageLog: {
       create: jest.fn(),
@@ -129,19 +131,69 @@ describe('AnalyzeService', () => {
   });
 
   describe('getAnalysisHistory', () => {
-    it('should return user analysis history', async () => {
+    it('should return user analysis history list', async () => {
       mockPrismaService.analysisHistory.findMany.mockResolvedValue([
         mockAnalysisHistory,
       ]);
 
       const result = await service.getAnalysisHistory('user-id-1');
 
-      expect(result).toHaveLength(1);
+      expect(result.histories).toHaveLength(1);
+      expect(result.total).toBe(1);
+      expect(result.histories[0].id).toBe('history-id-1');
       expect(mockPrismaService.analysisHistory.findMany).toHaveBeenCalledWith({
         where: { userId: 'user-id-1' },
         orderBy: { createdAt: 'desc' },
         take: 20,
       });
+    });
+
+    it('should return empty list when no history found', async () => {
+      mockPrismaService.analysisHistory.findMany.mockResolvedValue([]);
+
+      const result = await service.getAnalysisHistory('user-id-1');
+
+      expect(result.histories).toHaveLength(0);
+      expect(result.total).toBe(0);
+    });
+  });
+
+  describe('getAnalysisHistoryById', () => {
+    it('should return analysis history by id', async () => {
+      mockPrismaService.analysisHistory.findFirst.mockResolvedValue(
+        mockAnalysisHistory,
+      );
+
+      const result = await service.getAnalysisHistoryById(
+        'user-id-1',
+        'history-id-1',
+      );
+
+      expect(result.id).toBe('history-id-1');
+      expect(result.userId).toBe('user-id-1');
+      expect(result.imageUrl).toBe(mockAnalysisHistory.imageUrl);
+      expect(mockPrismaService.analysisHistory.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'history-id-1',
+          userId: 'user-id-1',
+        },
+      });
+    });
+
+    it('should throw NotFoundException when history not found', async () => {
+      mockPrismaService.analysisHistory.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getAnalysisHistoryById('user-id-1', 'non-existent'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should not return other user history', async () => {
+      mockPrismaService.analysisHistory.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getAnalysisHistoryById('other-user', 'history-id-1'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });
