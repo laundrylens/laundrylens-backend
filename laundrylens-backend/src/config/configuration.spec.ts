@@ -37,21 +37,17 @@ describe('Configuration', () => {
     );
   });
 
-  it('should return jwt config', () => {
-    process.env.JWT_SECRET = 'test-secret';
-    process.env.JWT_EXPIRES_IN = '1d';
+  it('should return openai config', () => {
+    process.env.OPENAI_API_KEY = 'test-api-key';
     const config = configuration();
 
-    expect(config.jwt.secret).toBe('test-secret');
-    expect(config.jwt.expiresIn).toBe('1d');
+    expect(config.openai.apiKey).toBe('test-api-key');
   });
 
-  it('should return oauth config', () => {
-    process.env.KAKAO_CLIENT_ID = 'kakao-id';
-    process.env.GOOGLE_CLIENT_ID = 'google-id';
+  it('should return frontend config', () => {
+    process.env.FRONTEND_URL = 'https://example.com';
     const config = configuration();
 
-    expect(config.kakao.clientId).toBe('kakao-id');
-    expect(config.google.clientId).toBe('google-id');
+    expect(config.frontend.url).toBe('https://example.com');
   });
 });

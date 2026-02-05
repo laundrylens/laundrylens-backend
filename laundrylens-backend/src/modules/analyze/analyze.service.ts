@@ -1,16 +1,16 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { OpenAIVisionService } from './services';
 import {
   AnalyzeResultDto,
   DetectedSymbolDto,
-  AnalysisHistoryResponseDto,
-  AnalysisHistoryListResponseDto,
+  RemainingAnalysesDto,
 } from './dto';
 
 @Injectable()
 export class AnalyzeService {
   private readonly logger = new Logger(AnalyzeService.name);
+  private readonly DAILY_LIMIT = 5;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -19,9 +19,16 @@ export class AnalyzeService {
 
   async analyzeImage(
     imageBuffer: Buffer,
-    userId?: string,
-    guestId?: string,
+    guestId: string,
   ): Promise<AnalyzeResultDto> {
+    // 일일 제한 확인
+    const remaining = await this.getRemainingCount(guestId);
+    if (remaining <= 0) {
+      throw new ForbiddenException(
+        '오늘의 무료 분석 횟수를 모두 사용했습니다. 내일 다시 이용해주세요.',
+      );
+    }
+
     const startTime = Date.now();
 
     // 이미지를 Base64로 변환
@@ -37,23 +44,53 @@ export class AnalyzeService {
 
     const processingTime = Date.now() - startTime;
 
-    // 분석 이력 저장
-    const history = await this.saveAnalysisHistory(
-      imageBase64,
-      detectedSymbols,
-      userId,
-      guestId,
-    );
-
     // 사용량 로그 저장
-    await this.logUsage(userId, guestId);
+    await this.logUsage(guestId);
 
     return {
       detectedSymbols,
-      imageUrl: history.imageUrl,
       careTips: visionResult.careTips,
       processingTime,
     };
+  }
+
+  async getRemainingAnalyses(guestId: string): Promise<RemainingAnalysesDto> {
+    const remaining = await this.getRemainingCount(guestId);
+    const resetAt = this.getNextResetTime();
+
+    return {
+      remaining,
+      dailyLimit: this.DAILY_LIMIT,
+      resetAt: resetAt.toISOString(),
+    };
+  }
+
+  private async getRemainingCount(guestId: string): Promise<number> {
+    const todayStart = this.getTodayStart();
+
+    const usageCount = await this.prisma.usageLog.count({
+      where: {
+        guestId,
+        action: 'ANALYZE_IMAGE',
+        createdAt: {
+          gte: todayStart,
+        },
+      },
+    });
+
+    return Math.max(0, this.DAILY_LIMIT - usageCount);
+  }
+
+  private getTodayStart(): Date {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+
+  private getNextResetTime(): Date {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    return tomorrow;
   }
 
   private async matchSymbolsWithDatabase(
@@ -76,82 +113,12 @@ export class AnalyzeService {
     return detectedSymbols;
   }
 
-  private async saveAnalysisHistory(
-    imageBase64: string,
-    detectedSymbols: DetectedSymbolDto[],
-    userId?: string,
-    guestId?: string,
-  ) {
-    // 실제 구현에서는 이미지를 S3 등에 업로드하고 URL을 저장
-    // 여기서는 임시로 data URL 사용
-    const imageUrl = `data:image/jpeg;base64,${imageBase64.slice(0, 100)}...`;
-
-    return this.prisma.analysisHistory.create({
-      data: {
-        userId,
-        guestId,
-        imageUrl,
-        result: detectedSymbols as unknown as Parameters<
-          typeof this.prisma.analysisHistory.create
-        >[0]['data']['result'],
-      },
-    });
-  }
-
-  private async logUsage(userId?: string, guestId?: string) {
+  private async logUsage(guestId: string) {
     await this.prisma.usageLog.create({
       data: {
-        userId,
         guestId,
         action: 'ANALYZE_IMAGE',
       },
     });
-  }
-
-  async getAnalysisHistory(
-    userId: string,
-  ): Promise<AnalysisHistoryListResponseDto> {
-    const histories = await this.prisma.analysisHistory.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    });
-
-    return {
-      histories: histories.map((history) => ({
-        id: history.id,
-        userId: history.userId,
-        guestId: history.guestId,
-        imageUrl: history.imageUrl,
-        result: history.result as unknown as DetectedSymbolDto[],
-        createdAt: history.createdAt,
-      })),
-      total: histories.length,
-    };
-  }
-
-  async getAnalysisHistoryById(
-    userId: string,
-    historyId: string,
-  ): Promise<AnalysisHistoryResponseDto> {
-    const history = await this.prisma.analysisHistory.findFirst({
-      where: {
-        id: historyId,
-        userId,
-      },
-    });
-
-    if (!history) {
-      throw new NotFoundException('분석 이력을 찾을 수 없습니다.');
-    }
-
-    return {
-      id: history.id,
-      userId: history.userId,
-      guestId: history.guestId,
-      imageUrl: history.imageUrl,
-      result: history.result as unknown as DetectedSymbolDto[],
-      createdAt: history.createdAt,
-    };
   }
 }

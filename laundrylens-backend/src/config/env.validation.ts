@@ -28,51 +28,7 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  JWT_SECRET?: string;
-
-  @IsString()
-  @IsOptional()
-  JWT_EXPIRES_IN?: string;
-
-  @IsString()
-  @IsOptional()
-  JWT_REFRESH_EXPIRES_IN?: string;
-
-  @IsString()
-  @IsOptional()
-  KAKAO_CLIENT_ID?: string;
-
-  @IsString()
-  @IsOptional()
-  KAKAO_CLIENT_SECRET?: string;
-
-  @IsString()
-  @IsOptional()
-  KAKAO_CALLBACK_URL?: string;
-
-  @IsString()
-  @IsOptional()
-  GOOGLE_CLIENT_ID?: string;
-
-  @IsString()
-  @IsOptional()
-  GOOGLE_CLIENT_SECRET?: string;
-
-  @IsString()
-  @IsOptional()
-  GOOGLE_CALLBACK_URL?: string;
-
-  @IsString()
-  @IsOptional()
   OPENAI_API_KEY?: string;
-
-  @IsString()
-  @IsOptional()
-  TOSS_CLIENT_KEY?: string;
-
-  @IsString()
-  @IsOptional()
-  TOSS_SECRET_KEY?: string;
 
   @IsString()
   @IsOptional()

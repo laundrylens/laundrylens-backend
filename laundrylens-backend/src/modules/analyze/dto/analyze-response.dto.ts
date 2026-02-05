@@ -18,9 +18,6 @@ export class AnalyzeResultDto {
   })
   detectedSymbols: DetectedSymbolDto[];
 
-  @ApiProperty({ description: '원본 이미지 URL' })
-  imageUrl: string;
-
   @ApiPropertyOptional({ description: '추가 관리 팁' })
   careTips?: string;
 
@@ -28,37 +25,13 @@ export class AnalyzeResultDto {
   processingTime: number;
 }
 
-export class AnalyzeRequestDto {
-  // 이미지는 multipart/form-data로 전송되므로 별도 필드 불필요
-}
+export class RemainingAnalysesDto {
+  @ApiProperty({ description: '남은 분석 횟수', example: 3 })
+  remaining: number;
 
-export class AnalysisHistoryResponseDto {
-  @ApiProperty({ description: '이력 ID' })
-  id: string;
+  @ApiProperty({ description: '일일 최대 분석 횟수', example: 5 })
+  dailyLimit: number;
 
-  @ApiPropertyOptional({ description: '사용자 ID' })
-  userId?: string | null;
-
-  @ApiPropertyOptional({ description: '게스트 ID' })
-  guestId?: string | null;
-
-  @ApiProperty({ description: '이미지 URL' })
-  imageUrl: string;
-
-  @ApiProperty({ description: '분석 결과', type: [DetectedSymbolDto] })
-  result: DetectedSymbolDto[];
-
-  @ApiProperty({ description: '생성일시' })
-  createdAt: Date;
-}
-
-export class AnalysisHistoryListResponseDto {
-  @ApiProperty({
-    description: '분석 이력 목록',
-    type: [AnalysisHistoryResponseDto],
-  })
-  histories: AnalysisHistoryResponseDto[];
-
-  @ApiProperty({ description: '총 개수' })
-  total: number;
+  @ApiProperty({ description: '다음 리셋 시간 (ISO 8601)' })
+  resetAt: string;
 }

@@ -11,29 +11,6 @@ datasource db {
 // Enums
 // ============================================
 
-enum SocialProvider {
-  KAKAO
-  GOOGLE
-}
-
-enum PlanType {
-  MONTHLY
-  CREDITS
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  CANCELLED
-  EXPIRED
-}
-
-enum PaymentStatus {
-  PENDING
-  COMPLETED
-  FAILED
-  REFUNDED
-}
-
 enum SymbolCategory {
   WASH
   BLEACH
@@ -51,82 +28,6 @@ enum Frequency {
 // ============================================
 // Models
 // ============================================
-
-model User {
-  id           String    @id @default(uuid())
-  email        String?   @unique
-  nickname     String
-  profileImage String?   @map("profile_image")
-  isPremium    Boolean   @default(false) @map("is_premium")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  deletedAt    DateTime? @map("deleted_at")
-
-  socialAccounts    SocialAccount[]
-  subscriptions     Subscription[]
-  payments          Payment[]
-  usageLogs         UsageLog[]
-  analysisHistories AnalysisHistory[]
-
-  @@map("users")
-}
-
-model SocialAccount {
-  id           String         @id @default(uuid())
-  userId       String         @map("user_id")
-  provider     SocialProvider
-  providerId   String         @map("provider_id")
-  accessToken  String?        @map("access_token")
-  refreshToken String?        @map("refresh_token")
-  createdAt    DateTime       @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerId])
-  @@map("social_accounts")
-}
-
-model Subscription {
-  id        String             @id @default(uuid())
-  userId    String             @map("user_id")
-  planType  PlanType           @map("plan_type")
-  credits   Int                @default(0)
-  startedAt DateTime           @map("started_at")
-  expiresAt DateTime           @map("expires_at")
-  status    SubscriptionStatus @default(ACTIVE)
-  createdAt DateTime           @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("subscriptions")
-}
-
-model Payment {
-  id         String        @id @default(uuid())
-  userId     String        @map("user_id")
-  orderId    String        @unique @map("order_id")
-  paymentKey String?       @map("payment_key")
-  amount     Int
-  planType   PlanType      @map("plan_type")
-  status     PaymentStatus @default(PENDING)
-  createdAt  DateTime      @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("payments")
-}
-
-model UsageLog {
-  id        String   @id @default(uuid())
-  userId    String?  @map("user_id")
-  guestId   String?  @map("guest_id")
-  action    String
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@map("usage_logs")
-}
 
 model LaundrySymbol {
   id        String         @id @default(uuid())
@@ -153,19 +54,6 @@ model SymbolTranslation {
 
   @@unique([symbolId, countryCode])
   @@map("symbol_translations")
-}
-
-model AnalysisHistory {
-  id        String   @id @default(uuid())
-  userId    String?  @map("user_id")
-  guestId   String?  @map("guest_id")
-  imageUrl  String   @map("image_url")
-  result    Json
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@map("analysis_history")
 }
 
 model Material {
@@ -195,4 +83,14 @@ model MaterialSymbol {
 
   @@unique([materialId, symbolId])
   @@map("material_symbols")
+}
+
+model UsageLog {
+  id        String   @id @default(uuid())
+  guestId   String   @map("guest_id")
+  action    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([guestId, createdAt])
+  @@map("usage_logs")
 }

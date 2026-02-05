@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { AnalyzeService } from './analyze.service';
 import { OpenAIVisionService } from './services';
 import { PrismaService } from '../../prisma';
@@ -23,15 +23,6 @@ describe('AnalyzeService', () => {
     createdAt: new Date(),
   };
 
-  const mockAnalysisHistory = {
-    id: 'history-id-1',
-    userId: 'user-id-1',
-    guestId: null,
-    imageUrl: 'data:image/jpeg;base64,...',
-    result: mockVisionResult.symbols,
-    createdAt: new Date(),
-  };
-
   const mockOpenAIVisionService = {
     analyzeImage: jest.fn(),
   };
@@ -40,13 +31,9 @@ describe('AnalyzeService', () => {
     laundrySymbol: {
       findUnique: jest.fn(),
     },
-    analysisHistory: {
-      create: jest.fn(),
-      findMany: jest.fn(),
-      findFirst: jest.fn(),
-    },
     usageLog: {
       create: jest.fn(),
+      count: jest.fn(),
     },
   };
 
@@ -71,15 +58,14 @@ describe('AnalyzeService', () => {
   describe('analyzeImage', () => {
     it('should analyze image and return results', async () => {
       const imageBuffer = Buffer.from('test-image');
+      const guestId = 'guest-123';
 
+      mockPrismaService.usageLog.count.mockResolvedValue(0);
       mockOpenAIVisionService.analyzeImage.mockResolvedValue(mockVisionResult);
       mockPrismaService.laundrySymbol.findUnique.mockResolvedValue(mockSymbol);
-      mockPrismaService.analysisHistory.create.mockResolvedValue(
-        mockAnalysisHistory,
-      );
       mockPrismaService.usageLog.create.mockResolvedValue({});
 
-      const result = await service.analyzeImage(imageBuffer);
+      const result = await service.analyzeImage(imageBuffer, guestId);
 
       expect(result.detectedSymbols).toHaveLength(2);
       expect(result.careTips).toBe('손세탁 권장');
@@ -89,111 +75,81 @@ describe('AnalyzeService', () => {
 
     it('should match symbols with database', async () => {
       const imageBuffer = Buffer.from('test-image');
+      const guestId = 'guest-123';
 
+      mockPrismaService.usageLog.count.mockResolvedValue(0);
       mockOpenAIVisionService.analyzeImage.mockResolvedValue(mockVisionResult);
       mockPrismaService.laundrySymbol.findUnique.mockResolvedValueOnce(
         mockSymbol,
       );
       mockPrismaService.laundrySymbol.findUnique.mockResolvedValueOnce(null);
-      mockPrismaService.analysisHistory.create.mockResolvedValue(
-        mockAnalysisHistory,
-      );
       mockPrismaService.usageLog.create.mockResolvedValue({});
 
-      const result = await service.analyzeImage(imageBuffer);
+      const result = await service.analyzeImage(imageBuffer, guestId);
 
       expect(result.detectedSymbols[0].symbolId).toBe('symbol-id-1');
       expect(result.detectedSymbols[1].symbolId).toBeUndefined();
     });
 
-    it('should save analysis history for authenticated user', async () => {
+    it('should log usage after analysis', async () => {
       const imageBuffer = Buffer.from('test-image');
-      const userId = 'user-id-1';
+      const guestId = 'guest-123';
 
+      mockPrismaService.usageLog.count.mockResolvedValue(0);
       mockOpenAIVisionService.analyzeImage.mockResolvedValue(mockVisionResult);
       mockPrismaService.laundrySymbol.findUnique.mockResolvedValue(mockSymbol);
-      mockPrismaService.analysisHistory.create.mockResolvedValue(
-        mockAnalysisHistory,
-      );
       mockPrismaService.usageLog.create.mockResolvedValue({});
 
-      await service.analyzeImage(imageBuffer, userId);
+      await service.analyzeImage(imageBuffer, guestId);
 
-      expect(mockPrismaService.analysisHistory.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          data: expect.objectContaining({
-            userId,
-          }),
-        }),
-      );
-    });
-  });
-
-  describe('getAnalysisHistory', () => {
-    it('should return user analysis history list', async () => {
-      mockPrismaService.analysisHistory.findMany.mockResolvedValue([
-        mockAnalysisHistory,
-      ]);
-
-      const result = await service.getAnalysisHistory('user-id-1');
-
-      expect(result.histories).toHaveLength(1);
-      expect(result.total).toBe(1);
-      expect(result.histories[0].id).toBe('history-id-1');
-      expect(mockPrismaService.analysisHistory.findMany).toHaveBeenCalledWith({
-        where: { userId: 'user-id-1' },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-      });
-    });
-
-    it('should return empty list when no history found', async () => {
-      mockPrismaService.analysisHistory.findMany.mockResolvedValue([]);
-
-      const result = await service.getAnalysisHistory('user-id-1');
-
-      expect(result.histories).toHaveLength(0);
-      expect(result.total).toBe(0);
-    });
-  });
-
-  describe('getAnalysisHistoryById', () => {
-    it('should return analysis history by id', async () => {
-      mockPrismaService.analysisHistory.findFirst.mockResolvedValue(
-        mockAnalysisHistory,
-      );
-
-      const result = await service.getAnalysisHistoryById(
-        'user-id-1',
-        'history-id-1',
-      );
-
-      expect(result.id).toBe('history-id-1');
-      expect(result.userId).toBe('user-id-1');
-      expect(result.imageUrl).toBe(mockAnalysisHistory.imageUrl);
-      expect(mockPrismaService.analysisHistory.findFirst).toHaveBeenCalledWith({
-        where: {
-          id: 'history-id-1',
-          userId: 'user-id-1',
+      expect(mockPrismaService.usageLog.create).toHaveBeenCalledWith({
+        data: {
+          guestId: 'guest-123',
+          action: 'ANALYZE_IMAGE',
         },
       });
     });
 
-    it('should throw NotFoundException when history not found', async () => {
-      mockPrismaService.analysisHistory.findFirst.mockResolvedValue(null);
+    it('should throw ForbiddenException when daily limit exceeded', async () => {
+      const imageBuffer = Buffer.from('test-image');
+      const guestId = 'guest-123';
 
-      await expect(
-        service.getAnalysisHistoryById('user-id-1', 'non-existent'),
-      ).rejects.toThrow(NotFoundException);
+      mockPrismaService.usageLog.count.mockResolvedValue(5);
+
+      await expect(service.analyzeImage(imageBuffer, guestId)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+  });
+
+  describe('getRemainingAnalyses', () => {
+    it('should return remaining analyses count', async () => {
+      const guestId = 'guest-123';
+      mockPrismaService.usageLog.count.mockResolvedValue(2);
+
+      const result = await service.getRemainingAnalyses(guestId);
+
+      expect(result.remaining).toBe(3);
+      expect(result.dailyLimit).toBe(5);
+      expect(result.resetAt).toBeDefined();
     });
 
-    it('should not return other user history', async () => {
-      mockPrismaService.analysisHistory.findFirst.mockResolvedValue(null);
+    it('should return 0 when all analyses used', async () => {
+      const guestId = 'guest-123';
+      mockPrismaService.usageLog.count.mockResolvedValue(5);
 
-      await expect(
-        service.getAnalysisHistoryById('other-user', 'history-id-1'),
-      ).rejects.toThrow(NotFoundException);
+      const result = await service.getRemainingAnalyses(guestId);
+
+      expect(result.remaining).toBe(0);
+    });
+
+    it('should return full limit for new guest', async () => {
+      const guestId = 'new-guest';
+      mockPrismaService.usageLog.count.mockResolvedValue(0);
+
+      const result = await service.getRemainingAnalyses(guestId);
+
+      expect(result.remaining).toBe(5);
     });
   });
 });
